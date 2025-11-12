@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardBody, CardHeader, Divider, Spacer, Button } from "@heroui/react";
 import { TodoInput } from "@/components/TodoInput";
 import { TaskItem, UITask } from "@/components/TodoItem";
-import { TaskCounter } from "@/components/Counter";
+import { Counter } from "@/components/Counter";
 
 export default function HomePage() {
   const [tasks, setTasks] = useState<UITask[]>([]);

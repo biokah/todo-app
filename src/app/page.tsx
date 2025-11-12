@@ -1,66 +1,135 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import { Card, CardBody, CardHeader, Divider, Spacer, Button } from "@heroui/react";
+import { TodoInput } from "@/components/TodoInput";
+import { TaskItem, UITask } from "@/components/TodoItem";
+import { TaskCounter } from "@/components/Counter";
 
-export default function Home() {
+export default function HomePage() {
+  const [tasks, setTasks] = useState<UITask[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const res = await fetch("/api/tasks", { cache: "no-store" });
+      const data = await res.json();
+      setTasks(data.tasks);
+      setLoading(false);
+    })();
+  }, []);
+
+  const totals = useMemo(() => {
+    const total = tasks.length;
+    const done = tasks.filter((t) => t.completed).length;
+    return { total, done };
+  }, [tasks]);
+
+  async function addTask(title: string) {
+    const optimistic: UITask = { id: `temp-${crypto.randomUUID()}`, title, completed: false };
+    setTasks((prev) => [optimistic, ...prev]);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const { task } = await res.json();
+      setTasks((prev) => [task, ...prev.filter((t) => t.id !== optimistic.id)]);
+    } catch {
+      setTasks((prev) => prev.filter((t) => t.id !== optimistic.id));
+    }
+  }
+
+  async function toggleTask(id: string) {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
+    try {
+      await fetch(`/api/tasks/${id}`, { method: "PATCH" });
+    } catch {
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
+    }
+  }
+
+  async function removeTask(id: string) {
+    const snapshot = tasks;
+    setTasks((cur) => cur.filter((t) => t.id !== id));
+    try {
+      await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+    } catch {
+      setTasks(snapshot);
+    }
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "linear-gradient(to bottom right, #eef0ff, #f6f7ff)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: "2rem",
+      }}
+    >
+      <Card
+        shadow="md"
+        radius="md"
+        style={{
+          width: "100%",
+          maxWidth: 500,
+          background: "#fff",
+          border: "1px solid rgba(0,0,0,0.05)",
+        }}
+      >
+        <CardHeader style={{ flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 700 }}>
+            📝 Mi Lista de Tareas
+          </h1>
+          <p style={{ color: "#666", fontSize: 14 }}>
+            {totals.total - totals.done === 0
+              ? "0 tareas pendientes"
+              : `${totals.total - totals.done} tareas pendientes`}
           </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        </CardHeader>
+
+        <Divider />
+
+        <CardBody style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <TodoInput onAdd={addTask} />
+
+          {loading ? (
+            <p>Cargando…</p>
+          ) : tasks.length === 0 ? (
+            <p style={{ textAlign: "center", color: "#777" }}>
+              No hay tareas aún ✨
+            </p>
+          ) : (
+            <ul style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {tasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onToggle={toggleTask}
+                  onRemove={removeTask}
+                />
+              ))}
+            </ul>
+          )}
+
+          <Divider />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 14,
+              color: "#555",
+            }}
           >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+            <span>Total: {totals.total}</span>
+            <span>Completadas: {totals.done}</span>
+          </div>
+        </CardBody>
+      </Card>
     </div>
   );
 }
+
